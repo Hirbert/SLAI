@@ -1,21 +1,21 @@
 #!coding:utf-8
 
 #----------------------------------------------
-#Project: 商检-基础流程-基础分析
-#Description: 酶切过滤程序的核心模块-比对部分, 也可单独使用，输出snv附近的负链比对结果
-#Usage: ./artifact_identify.py -h
-#Author: 骆磊
+#Project: Commercial Inspection - Basic Process - Basic Analysis
+#Description: Core module of enzyme digestion filtering program - alignment part, can also be used separately to output negative strand alignment results near SNV
+#Usage: python3 artifact_identify.py -h
+#Author: Luo Lei
 #------------------------------------------------
 
 #-----------------
-#v0.4, support_reads从v2修改为v3
-#v0.5, support_reads_v5, reads分级
+#v0.4, support_reads modified from v2 to v3
+#v0.5, support_reads_v5, read classification
 import pysam
 import argparse
 import re
 import os
 import bamhunter
-# from multi_thread import *  # 调用的脚本函数有问题，不会用到
+# from multi_thread import *  # The called script function has issues, will not be used
 from artifact_identify import *
 import Needleman_Wunsch as NW
 import support_reads as sr
@@ -37,7 +37,7 @@ def argument_parser():
 
 def find_passengers(seq1,seq2,seq3):
     '''
-    寻找是否匹配会引起passengers snv，并且read是否支持passengers snv
+    Check whether matching causes passenger SNVs and whether the read supports passenger SNVs
     '''
     match_cigar_1_2=NW.local_alignment(seq2,seq1)
     match_cigar_1_3=NW.local_alignment(seq3,seq1)
@@ -50,15 +50,15 @@ def find_passengers(seq1,seq2,seq3):
     ref_pos=0
     cigar_status_1_2=[]
     for each_cigar in cigar_parse_1_2:
-        if each_cigar[2]=='I':#消耗reads，ref不变
-            cigar_status_1_2.append([query_pos,seq2[query_pos:query_pos+int(each_cigar[1])],ref_pos,'-'])#ref是1based
+        if each_cigar[2]=='I':#Consumes reads, ref unchanged
+            cigar_status_1_2.append([query_pos,seq2[query_pos:query_pos+int(each_cigar[1])],ref_pos,'-'])#ref is 1-based
             query_pos+=int(each_cigar[1])
-            #query_pos和query_pos+int(each[1])是ins在reads上的起始和终止位点
-            #ref_pos+1是插入位置, 应该是在ref_pos和ref_pos+1中间插入
-            #"-",表示ref型是'-'
+            #query_pos and query_pos+int(each[1]) are the start and end positions of insertion on reads
+            #ref_pos+1 is the insertion position, should be inserted between ref_pos and ref_pos+1
+            #"-", indicates ref type is '-'
             #-----------------------
-        #D会消耗ref的碱基，但reads的碱基位置不变，所以只有ref的指针需要变化
-        if each_cigar[2]=='D':#消耗ref，reads不变
+        #D consumes reference bases, read base position unchanged, so only ref pointer needs to change
+        if each_cigar[2]=='D':#Consumes ref, reads unchanged
             cigar_status_1_2.append([query_pos,'-',ref_pos,seq1[ref_pos:ref_pos+int(each_cigar[1])]])
             ref_pos+=int(each_cigar[1])
         #mismatch
@@ -76,15 +76,15 @@ def find_passengers(seq1,seq2,seq3):
     ref_pos=0
     cigar_status_1_3=[]
     for each_cigar in cigar_parse_1_3:
-        if each_cigar[2]=='I':#消耗reads，ref不变
-            cigar_status_1_3.append([query_pos,seq3[query_pos:query_pos+int(each_cigar[1])],ref_pos,'-'])#ref是1based
+        if each_cigar[2]=='I':#Consumes reads, ref unchanged
+            cigar_status_1_3.append([query_pos,seq3[query_pos:query_pos+int(each_cigar[1])],ref_pos,'-'])#ref is 1-based
             query_pos+=int(each_cigar[1])
-            #query_pos和query_pos+int(each[1])是ins在reads上的起始和终止位点
-            #ref_pos+1是插入位置, 应该是在ref_pos和ref_pos+1中间插入
-            #"-",表示ref型是'-'
+            #query_pos and query_pos+int(each[1]) are the start and end positions of insertion on reads
+            #ref_pos+1 is the insertion position, should be inserted between ref_pos and ref_pos+1
+            #"-", indicates ref type is '-'
             #-----------------------
-        #D会消耗ref的碱基，但reads的碱基位置不变，所以只有ref的指针需要变化
-        if each_cigar[2]=='D':#消耗ref，reads不变
+        #D consumes reference bases, read base position unchanged, so only ref pointer needs to change
+        if each_cigar[2]=='D':#Consumes ref, reads unchanged
             cigar_status_1_3.append([query_pos,'-',ref_pos,seq1[ref_pos:ref_pos+int(each_cigar[1])]])
             ref_pos+=int(each_cigar[1])
         #match or mismatch
@@ -108,7 +108,7 @@ def find_passengers(seq1,seq2,seq3):
 
 def get_complement_region(ref_sequence,ref_pos,sequence,cigar,match_results_f):
     '''
-    将read匹配上的区域对应到基因组上
+    Map the matched region of the read to the genome
     '''
     (chrname,pos,ref_base,alt_base,m_score,m_cigar,new_start1,new_end1,mseq1,reverse_mseq1,start2,end2,mseq2,reverse_mseq2,similarity)=match_results_f
     m_cigar=reverse_cigar(m_cigar)
@@ -117,34 +117,34 @@ def get_complement_region(ref_sequence,ref_pos,sequence,cigar,match_results_f):
     ref_pos-=1
     new_start1-=1
     new_end1-=1
-    query_pos=0#作为指针，用于标记当前处理的碱基相对于reads起始碱基的位置
-    pattern=re.compile('((\d+)([SHMXNDI]))')#提取cigar列信息的pattern
+    query_pos=0#Used as a pointer to mark the current base position relative to the read start base
+    pattern=re.compile('((\d+)([SHMXNDI]))')#Pattern for extracting CIGAR information
     cigar_parse=re.findall(pattern,cigar)
     read_map_status=[]
-    read_complement_pos=[]#存储read的complement的位点
+    read_complement_pos=[]#Store complement positions of the read
 
-    for each_cigar in cigar_parse:#cigar中每个元素的处理, 每个子列表的第一个元素是不需要的[['',10,'S'],['',33,'M'],['',2,'I'],['',15,'M'],['',6,'D'],['',29,'M'],['',1,'D'],['',11,'M']]
+    for each_cigar in cigar_parse:#Process each element in CIGAR, the first element of each sublist is not needed [['',10,'S'],['',33,'M'],['',2,'I'],['',15,'M'],['',6,'D'],['',29,'M'],['',1,'D'],['',11,'M']]
 
-        #S部分, reads序列会在bam中展示,起始位点其实是在reads中间的某个碱基
-        if each_cigar[2]=='S':#跳过，不修改任何东西，但reads的坐标需要改动,ref坐标不变
+        #S part, read sequence will be displayed in bam, the start position is actually somewhere in the middle of the read
+        if each_cigar[2]=='S':#Skip, don't modify anything, but read coordinates need to change, ref coordinates unchanged
             query_pos+=int(each_cigar[1])
-        #H对解析bam无影响，bam中不会显示H部分的序列
-        if each_cigar[2]=='H': #直接跳过
+        #H has no effect on bam parsing, bam does not display the H part sequence
+        if each_cigar[2]=='H': #Skip directly
             pass
-        #I会消耗reads的碱基，但ref的位置不变，所以只有reads的指针需要变化
-        if each_cigar[2]=='I':#消耗reads，ref不变
+        #I consumes read bases, ref position unchanged, so only read pointer needs to change
+        if each_cigar[2]=='I':#Consumes reads, ref unchanged
             read_map_status.append([query_pos,sequence[query_pos:query_pos+int(each_cigar[1])],ref_pos+1,"-"])
             query_pos+=int(each_cigar[1])
-            #query_pos和query_pos+int(each[1])是ins在reads上的起始和终止位点
-            #ref_pos+1是插入位置, 应该是在ref_pos和ref_pos+1中间插入
-            #"-",表示ref型是'-'
+            #query_pos and query_pos+int(each[1]) are the start and end positions of insertion on reads
+            #ref_pos+1 is the insertion position, should be inserted between ref_pos and ref_pos+1
+            #"-", indicates ref type is '-'
             #-----------------------
-        #D会消耗ref的碱基，但reads的碱基位置不变，所以只有ref的指针需要变化
-        if each_cigar[2]=='D':#消耗ref，reads不变
+        #D consumes reference bases, read base position unchanged, so only ref pointer needs to change
+        if each_cigar[2]=='D':#Consumes ref, reads unchanged
             read_map_status.append([query_pos,"-",ref_pos+1,ref_sequence[ref_pos:ref_pos+int(each_cigar[1])]])
             ref_pos+=int(each_cigar[1])
 
-        #match时，ref和alt的指针都需要变化，这里先不管mismatch的情况
+        #For match, both ref and alt pointers need to change, ignore mismatch case for now
         if each_cigar[2]=='M':
             for i in range(int(each_cigar[1])):
                 read_map_status.append([query_pos,sequence[query_pos],ref_pos+1,ref_sequence[ref_pos]])
@@ -152,7 +152,7 @@ def get_complement_region(ref_sequence,ref_pos,sequence,cigar,match_results_f):
                 query_pos+=1
     k=0
     for each_base_map in read_map_status:
-        #I会消耗reads的碱基，但ref的位置不变，所以只有reads的指针需要变化
+        #I consumes read bases, ref position unchanged, so only read pointer needs to change
         if each_base_map[0] >=start2 and each_base_map[0]<=end2:
             read_complement_pos.append(each_base_map[0])
 
@@ -172,22 +172,22 @@ def get_complement_region(ref_sequence,ref_pos,sequence,cigar,match_results_f):
         return 0,0,0,0,0,0,0,0,0
     #local alignment cigar
     read_complement_cigar_status=[]
-    ref_seq_c=reverse_mseq1# 匹配部分的基因组序列的反向互补序列
-    ref_start_c=new_end1# 由于反向互补，起始位置其实是由终止位置来的
+    ref_seq_c=reverse_mseq1# Reverse complement of the genomic sequence of the matched portion
+    ref_start_c=new_end1# Due to reverse complement, the start position actually comes from the end position
     ref_end_c=new_start1
     query_pos_c=start2
 
     m_cigar_parse=re.findall(pattern,m_cigar)
     for each_m_cigar in m_cigar_parse:
-        if each_m_cigar[2]=='I':#消耗reads，ref不变
-            read_complement_cigar_status.append([query_pos_c,ref_start_c+1])#ref是1based
+        if each_m_cigar[2]=='I':#Consumes reads, ref unchanged
+            read_complement_cigar_status.append([query_pos_c,ref_start_c+1])#ref is 1-based
             query_pos_c+=int(each_m_cigar[1])
-            #query_pos和query_pos+int(each[1])是ins在reads上的起始和终止位点
-            #ref_pos+1是插入位置, 应该是在ref_pos和ref_pos+1中间插入
-            #"-",表示ref型是'-'
+            #query_pos and query_pos+int(each[1]) are the start and end positions of insertion on reads
+            #ref_pos+1 is the insertion position, should be inserted between ref_pos and ref_pos+1
+            #"-", indicates ref type is '-'
             #-----------------------
-        #D会消耗ref的碱基，但reads的碱基位置不变，所以只有ref的指针需要变化
-        if each_m_cigar[2]=='D':#消耗ref，reads不变
+        #D consumes reference bases, read base position unchanged, so only ref pointer needs to change
+        if each_m_cigar[2]=='D':#Consumes ref, reads unchanged
             read_complement_cigar_status.append([query_pos_c,ref_start_c+1])
             ref_start_c-=int(each_m_cigar[1])
         #match or mismatch
@@ -220,7 +220,7 @@ def get_complement_region(ref_sequence,ref_pos,sequence,cigar,match_results_f):
 
 def filter_snv(snv,snv_information_dict):
     '''
-    这个函数用于去掉认为不是回文阳性的snv, 频率>30或者是黑名单的位点不做处理
+    This function is used to remove SNVs that are not considered palindrome positive. Sites with frequency >30 or blacklisted are not processed
     '''
     freq=snv_information_dict[snv][0]
     black_flag=snv_information_dict[snv][1]
@@ -236,7 +236,7 @@ def filter_snv(snv,snv_information_dict):
 
 def read_vcf_with_support_reads(snv):
     '''
-    读入带有support reads信息的snv文件，并存入字典
+    Read SNV file with support reads information and store in dictionary
     '''
     all_support_reads_dict={}#{readid:None,...}
     snv_support_reads_dict={}
@@ -258,7 +258,7 @@ def read_vcf_with_support_reads(snv):
 
 def change_sequence_by_snv(start,end,region,snv):#1-based
     '''
-    比对前，用alt带替ref序列
+    Before alignment, replace ref sequence with alt
     '''
     (chrname,snv_pos,ref_base,alt_base)=snv.split('\t')
     snv_pos=int(snv_pos)
@@ -282,7 +282,7 @@ def change_sequence_by_snv(start,end,region,snv):#1-based
 
 def get_position_read_ref(read_ref_pair_pos_dict,readid,pos):
     '''
-    从reads的碱基位点推断基因组上的位点
+    Infer genomic position from read base position
     '''
     for eachpos in read_ref_pair_pos_dict[readid]:
         if eachpos[0]==pos-1:
@@ -291,19 +291,19 @@ def get_position_read_ref(read_ref_pair_pos_dict,readid,pos):
 
 def get_position_ref_read(read_ref_pair_pos_dict,readid,pos):
     '''
-    从ref位点推断reads位点
+    Infer read position from reference position
     '''
     aligned_pairs=read_ref_pair_pos_dict[readid][3].get_aligned_pairs()
     for eachpos in aligned_pairs:
         if eachpos[1]==pos-1:
         #chr15    90630344    C    G    15    E100044124L1C030R01000347883_163    90630333    4S94M2S    40    20M    1.0    90630334    90630353    CCCAGCGTACCCTGGGCCAG    CTGGCCCAGGGTACGCTGGG    1    20    CTGGCCCAGGGTACGCTGGG    CCCAGCGTACCCTGGGCCAG    CTGGCCCAGGGTACGCTGGGCCAGGATGTCTGACTGCACATCTCCGTCATAGTTCTTGCAGGCCCACACAAAGCCACCCGAAGACTTGAGGACCTGAGAT
-#[(0, 90631630), (1, 90631631), (2, 90631632), (3, 90631633), (4, 90631634), (5, 90631635), ******(None, 90631636)******, (6, 90631637), (7, 90631638), (8, 90631639), (9, 90631640), (10, 90631641), (11, None), (12, 90631642), (13, 90631643), (14, 90631644), (15, 90631645), (16, 90631646), (17, 90631647), (18, 90631648), (19, 90631649), (20, 90631650), (21, 90631651), (22, 90631652), (23, 90631653), (24, 90631654), (25, 90631655), (26, 90631656), (27, 90631657),(28, 90631658), (29, 90631659), (30, 90631660), (31, 90631661), (32, 90631662), (33, 90631663), (34, 90631664), (35, 90631665), (36, 90631666), (37, 90631667), (38, 90631668), (39, 90631669), (40, 90631670), (41, 90631671), (42, 90631672), (43, 90631673), (44, 90631674), (45, 90631675), (46, 90631676), (47, 90631677), (48, 90631678), (49, 90631679), (50, 90631680), (51, 90631681), (52, 90631682), (53, 90631683), (54, 90631684), (55, 90631685), (56, 90631686), (57, 90631687), (58, 90631688), (59, 90631689), (60, 90631690), (61, 90631691), (62, 90631692), (63, 90631693), (64, 90631694), (65, 90631695), (66, 90631696), (67, 90631697), (68, 90631698), (69, 90631699), (70, 90631700), (71, 90631701), (72, 90631702), (73, 90631703), (74, 90631704), (75, 90631705), (76, 90631706), (77, 90631707), (78, 90631708), (79, 90631709), (80, 90631710), (81, 90631711), (82, 90631712), (83, 90631713), (84, 90631714), (85, 90631715), (86, 90631716), (87, 90631717), (88, 90631718)] 90631636发生的Deletion
-            if eachpos[0] or eachpos[0] == 0:#如果是del，发生del的read pos是none
+#[(0, 90631630), (1, 90631631), (2, 90631632), (3, 90631633), (4, 90631634), (5, 90631635), ******(None, 90631636)******, (6, 90631637), (7, 90631638), (8, 90631639), (9, 90631640), (10, 90631641), (11, None), (12, 90631642), (13, 90631643), (14, 90631644), (15, 90631645), (16, 90631646), (17, 90631647), (18, 90631648), (19, 90631649), (20, 90631650), (21, 90631651), (22, 90631652), (23, 90631653), (24, 90631654), (25, 90631655), (26, 90631656), (27, 90631657),(28, 90631658), (29, 90631659), (30, 90631660), (31, 90631661), (32, 90631662), (33, 90631663), (34, 90631664), (35, 90631665), (36, 90631666), (37, 90631667), (38, 90631668), (39, 90631669), (40, 90631670), (41, 90631671), (42, 90631672), (43, 90631673), (44, 90631674), (45, 90631675), (46, 90631676), (47, 90631677), (48, 90631678), (49, 90631679), (50, 90631680), (51, 90631681), (52, 90631682), (53, 90631683), (54, 90631684), (55, 90631685), (56, 90631686), (57, 90631687), (58, 90631688), (59, 90631689), (60, 90631690), (61, 90631691), (62, 90631692), (63, 90631693), (64, 90631694), (65, 90631695), (66, 90631696), (67, 90631697), (68, 90631698), (69, 90631699), (70, 90631700), (71, 90631701), (72, 90631702), (73, 90631703), (74, 90631704), (75, 90631705), (76, 90631706), (77, 90631707), (78, 90631708), (79, 90631709), (80, 90631710), (81, 90631711), (82, 90631712), (83, 90631713), (84, 90631714), (85, 90631715), (86, 90631716), (87, 90631717), (88, 90631718)] Deletion occurring at 90631636
+            if eachpos[0] or eachpos[0] == 0:#If deletion, read pos with deletion is none
                 return eachpos[0]+1
             else:
                 return last_pos+1
         last_pos=eachpos[0]
-        #insert在read边缘的情况，返回1
+        #Insertion at read edge, return 1
     if aligned_pairs[0][1]==None and aligned_pairs[0][0]==0:
         return 1
     print(aligned_pairs)
@@ -312,7 +312,7 @@ def get_position_ref_read(read_ref_pair_pos_dict,readid,pos):
     raise Exception()
 def get_refseq(chrname,pos,ref,alt,ref_dict,flank):
     '''
-    获取snv附近的参考基因组序列
+    Get reference genome sequence near the SNV
     '''
     upstream=ref_dict[chrname][pos-flank:pos]
     downstream=ref_dict[chrname][pos+len(ref):pos+len(ref)+flank]
@@ -331,15 +331,15 @@ def reverse_cigar(cigarstring):
 def main(bam,fasta,outdir,outfile,snvfile,flank):
     out_prefix=os.path.join(outdir,outfile)
     final_outfile=out_prefix+'.snv_supportReads.txt'
-    #-------------------初始准备
-    #读取fasta
+    #-------------------Initial preparation
+    #Read fasta
 #    print("Read fasta")
     ref_dict=read_fasta(fasta)
 #    print("Read fasta over")
     out_prefix=os.path.join(outdir,outfile)
 
 
-    #处理bam获取每个snv的support reads，这步可以跳过以用于兼容不同方式获取的support reads
+    #Process bam to get support reads for each snv, this step can be skipped to be compatible with support reads obtained by different methods
     bamfile=bamhunter.bamhunter(bam)
     (snv_dict,snv_indel_dict,snv_complex_dict,raw_snv_dict,raw_snv_list,snv_header,snv_info_dict)=sr.parser_snv_file(snvfile)
     snv_support_dict=sr.single_base_snv(bamfile,snv_dict,ref_dict)
@@ -381,7 +381,7 @@ def main(bam,fasta,outdir,outfile,snvfile,flank):
     alignment_results=out_prefix+'_artifact_match.txt'
     w=open(alignment_results,'w')
     for eachsnv in raw_snv_list:
-        if filter_snv(eachsnv,snv_info_dict):#根据snv的信息预判断是否为回文假阳，如果不是，那就不参与后面的分析，直接判为阴性
+        if filter_snv(eachsnv,snv_info_dict):#Pre-determine whether it is a palindrome false positive based on SNV information, if not, skip the subsequent analysis and directly judge as negative
             pass
         else:
             continue
@@ -400,7 +400,7 @@ def main(bam,fasta,outdir,outfile,snvfile,flank):
                 (complement_raw_start,complement_raw_end,complement_raw_region,complement_mate_start,complement_mate_end,complement_mate_region,complement_read_start,complement_read_end,complement_read_region)=get_complement_region(ref_dict[chrname],read_start,sr.READID_SEQUENCE_DICT[read][3].query_sequence,cigar,match_results)
                 if not complement_raw_region:
                     continue
-                complement_raw_region_modify=change_sequence_by_snv(complement_raw_start,complement_raw_end,complement_raw_region,eachsnv)#变异应该都必定存在complement_raw_region范围内，如果不是，这里会报错，应该不存在这种情
+                complement_raw_region_modify=change_sequence_by_snv(complement_raw_start,complement_raw_end,complement_raw_region,eachsnv)#The variant must exist within complement_raw_region range, if not, an error will occur here, this situation should not exist
                 passengers=find_passengers(complement_raw_region_modify,complement_reverse(complement_mate_region),complement_read_region)#[[8, 'C', 8, 'T'], [11, 'A', 11, 'G'], [20, 'T', 20, 'G']]
                 really_passengers=[]
                 for eachpassenger in passengers:

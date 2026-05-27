@@ -1,10 +1,10 @@
 #!coding:utf-8
 
 #----------------------------------------------
-#Project: 商检-基础流程-基础分析
-#Description: 酶切过滤程序的核心模块-动态规划全局比对
-#Usage: 不单独使用
-#Author: 骆磊
+#Project: Commercial Inspection - Basic Process - Basic Analysis
+#Description: Core module of enzyme digestion filtering program - dynamic programming global alignment
+#Usage: Not used alone
+#Author: Luo Lei
 #------------------------------------------------
 
 import sys
@@ -26,13 +26,13 @@ def local_alignment(seq1,seq2,keysite1=None,keysite2=None):
     len2=len(seq2)
     score_matrix=[]
 
-    #生成初始打分矩阵
+    #Generate initial scoring matrix
     for i in range(len1+1):
         score_matrix.append([])
         for j in range(len2+1):
             score_matrix[i].append(0)
 
-    #罚分初始矩阵
+    #Initialize penalty matrix
     for i in range(len(score_matrix[0])):
         if i==0:continue
         score_matrix[0][i]=score_matrix[0][i-1]+gap
@@ -41,7 +41,7 @@ def local_alignment(seq1,seq2,keysite1=None,keysite2=None):
         score_matrix[i][0]=score_matrix[i-1][0]+gap
 
     
-    #构建打分矩阵
+    #Build scoring matrix
     for i in range(len(score_matrix)):
         if i==0:continue
         for j in range(len(score_matrix[i])):
@@ -55,9 +55,9 @@ def local_alignment(seq1,seq2,keysite1=None,keysite2=None):
             score_matrix[i][j]=max([score_0,score_1,score_2])
 #    print_matrix(score_matrix)
 
-    #全局比对回溯
+    #Global alignment backtracking
     m_cigar=Needleman_Wunsch(seq1,seq2,score_matrix)
-    #局部比对回溯
+    #Local alignment backtracking
     return m_cigar
     
 
@@ -76,8 +76,8 @@ def Needleman_Wunsch(seq1,seq2,score_matrix):
     recall=[]
     m_cigar=[]
     while i>0 and j>0:
-        score=score_matrix[i][j]#该点比对分数
-        #向左上回溯
+        score=score_matrix[i][j]#Alignment score at this point
+        #Backtrack to upper-left
         if seq1[i-1]==seq2[j-1]:
             if score_matrix[i-1][j-1]+match==score:
                 recall.append([0,i,j])
@@ -92,13 +92,13 @@ def Needleman_Wunsch(seq1,seq2,score_matrix):
                 j-=1
                 m_cigar.append('S')
                 continue
-        #向左回溯
+        #Backtrack left
         if score_matrix[i-1][j]+gap==score:
                 recall.append([-1,i,j])
                 i-=1
                 m_cigar.append('I')
                 continue
-        #向上回溯
+        #Backtrack up
         if score_matrix[i][j-1]+gap==score:
                 recall.append([1,i,j])
                 j-=1
@@ -125,7 +125,7 @@ def Needleman_Wunsch(seq1,seq2,score_matrix):
 def Smith_Waterman(seq1,seq2,score_matrix):
 #    i=len(seq1)
 #    j=len(seq2)
-    #找到最高分值位置
+    #Find the highest scoring position
     max_score=-100000000000000000000000000
     
     for i in range(len(score_matrix)):
@@ -135,7 +135,7 @@ def Smith_Waterman(seq1,seq2,score_matrix):
 #                print(max_score)
                 end1=i
                 end2=j
-#    #只找最后一列,假设query序列全部消耗
+#    #Only look at the last column, assuming query sequence is fully consumed
 #    for j in range(len(score_matrix[-1])):
 #        if score_matrix[-1][j] >= max_score:
 #            max_score=score_matrix[-1][j]
@@ -151,11 +151,11 @@ def Smith_Waterman(seq1,seq2,score_matrix):
     m_cigar=[]
     k=0
     while i>0 and j>0:
-        score=score_matrix[i][j]#该点比对分数
-        last_score=score_matrix[i-1][j-1]#左上比对分数
+        score=score_matrix[i][j]#Alignment score at this point
+        last_score=score_matrix[i-1][j-1]#Upper-left alignment score
         if score==0:break
             
-        #向左上回溯
+        #Backtrack to upper-left
         if seq1[i-1]==seq2[j-1]:
             if score_matrix[i-1][j-1]+match==score:
                 recall.append([0,i,j])
@@ -166,7 +166,7 @@ def Smith_Waterman(seq1,seq2,score_matrix):
                 similar+=1
                 total+=1
                 continue                
-        #错误左上回溯
+        #Incorrect backtrack to upper-left
         if seq1[i-1]!=seq2[j-1] and k==1:
             if score_matrix[i-1][j-1]+mismatch==score:
                 recall.append([0,i,j])
@@ -177,7 +177,7 @@ def Smith_Waterman(seq1,seq2,score_matrix):
                 matchsitelist.append([i,j])
                 continue    
         k=1                    
-        #向左回溯
+        #Backtrack left
         if score_matrix[i-1][j]+gap==score:
                 recall.append([-1,i,j])
                 i-=1
@@ -185,7 +185,7 @@ def Smith_Waterman(seq1,seq2,score_matrix):
                 total+=1
                 matchsitelist.append([i,j])
                 continue
-        #向上回溯
+        #Backtrack up
         if score_matrix[i][j-1]+gap==score:
                 recall.append([1,i,j])
                 j-=1
@@ -193,7 +193,7 @@ def Smith_Waterman(seq1,seq2,score_matrix):
                 total+=1
                 matchsitelist.append([i,j])
                 continue
-        #错误左上回溯
+        #Incorrect backtrack to upper-left
         if seq1[i-1]!=seq2[j-1]:
             if score_matrix[i-1][j-1]+mismatch==score:
                 recall.append([0,i,j])
@@ -203,7 +203,7 @@ def Smith_Waterman(seq1,seq2,score_matrix):
                 total+=1
                 matchsitelist.append([i,j])
                 continue
-        #最高位点被消除
+        #Highest scoring position eliminated
         if score_matrix[i][j-1]==-1 or score_matrix[i-1][j]==-1 or score_matrix[i-1][j-1]==-1:
             return -1,'',0,0,'',0,0,'',end1,end2,[],0
         break
