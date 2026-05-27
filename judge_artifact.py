@@ -1,10 +1,10 @@
 #!coding:utf-8
 
 #----------------------------------------------
-#Project: 商检-基础流程-基础分析
-#Description: 酶切过滤程序的核心模块-判断逻辑部分
-#Usage: ./judge_artifact.py -h
-#Author: 骆磊
+#Project: Commercial Inspection - Basic Process - Basic Analysis
+#Description: Core module of enzyme digestion filtering program - judgment logic part
+#Usage: python3 judge_artifact.py -h
+#Author: Luo Lei
 #------------------------------------------------
 
 import os
@@ -12,13 +12,13 @@ import argparse
 import re
 import support_reads as SR
 #------------------
-#read计数改为fragment计数 
-#v0.4添加位置和softclip的限制
-#v0.6允许softclip reads不到结尾允许有5bp的误差，位置关系放松至只需要有softclip就可以，不再要求方向。最小为9。hardclip直接认为是
-#v0.7，修正频率直接过滤，过滤掉的位点不出现在最终文件中
+#Changed read counting to fragment counting 
+#v0.4 Added position and softclip restrictions
+#v0.6 Allow softclip reads not reaching the end with 5bp error tolerance, relax position relationship to only require softclip, no longer require direction. Minimum is 9. Hardclip directly considered as
+#v0.7, Direct frequency filtering, filtered sites do not appear in the final file
 def complement_reverse(seq):
     '''
-    获取反向互补序列
+    Get reverse complementary sequence
     '''
     tmp=seq.upper()
     tmp=tmp.replace('A', 't')
@@ -38,7 +38,7 @@ def argument_parser():
     return argv
 
 def artifact_pos(cigar,start,end,read,panelname):
-    pattern=re.compile('((\d+)([SHMXNDI]))')#提取cigar列信息的pattern
+    pattern=re.compile('((\d+)([SHMXNDI]))')#Pattern for extracting CIGAR information
     cigar_parse=re.findall(pattern,cigar)#3S94M [('6S', '3', 'S'), ('94M', '94', 'M')]
     pos_vars_nosoftclip=1
     pos_vars_softclip=5
@@ -47,25 +47,25 @@ def artifact_pos(cigar,start,end,read,panelname):
         return True,'5prime',1
     if cigar_parse[-1][2]=='H' and not panelname=="panel43":
         return True,'3prime',1
-    if start <= 1+pos_vars_nosoftclip:#允许1个bp的误差
+    if start <= 1+pos_vars_nosoftclip:#Allow 1bp error tolerance
         pos='5prime'
         if cigar_parse[0][2]=='S' and int(cigar_parse[0][1])-(start-1)>=2:#softclip at least 2bp match 
-            readtype=1# 有clip部分
+            readtype=1# Has clip part
         else:
-            readtype=2# 无clip部分
+            readtype=2# No clip part
         return True,pos,readtype
-    elif end>=readlen-pos_vars_nosoftclip:#允许1个bp的误差
+    elif end>=readlen-pos_vars_nosoftclip:#Allow 1bp error tolerance
         pos='3prime'
         if cigar_parse[-1][2]=="S"  and int(cigar_parse[-1][1])-(readlen-end) >=2:#softclip at least 2bp match
-            readtype=1# 有clip部分
+            readtype=1# Has clip part
         else:
-            readtype=2# 无clip部分
+            readtype=2# No clip part
         return True,pos,readtype
     elif 'S' in cigar:
         if cigar_parse[0][2]=='S':
             if start<=1+pos_vars_softclip and start<=1+int(cigar_parse[0][1])-2:#cover at least 2 base at softclip region
                 pos='5prime'
-                readtype=1# 有clip部分
+                readtype=1# Has clip part
                 return True,pos,readtype
             elif start<=1+int(cigar_parse[0][1])-1:
                 pos='5prime'
@@ -76,7 +76,7 @@ def artifact_pos(cigar,start,end,read,panelname):
         elif cigar_parse[-1][2]=="S":
             if end>=readlen-pos_vars_softclip and end>=readlen-int(cigar_parse[-1][1]) +2:#cover at least 2 base at softclip region
                 pos='3prime'
-                readtype=1# 有clip部分
+                readtype=1# Has clip part
                 return True,pos,readtype
             elif end>=readlen-int(cigar_parse[-1][1]) +1:
                 pos='5prime'
@@ -93,7 +93,7 @@ def artifact_pos(cigar,start,end,read,panelname):
 
 def judge_read_artifact(readInfo,panelname):
     readid=readInfo[5]
-    fragmentid='_'.join(readid.split('_')[:-1])#E100047969L1C012R00300322929_163, 这样处理应该没问题
+    fragmentid='_'.join(readid.split('_')[:-1])#E100047969L1C012R00300322929_163, this processing should be fine
     cigar=readInfo[7]
     matchscore=int(readInfo[8])
     ref_seq=readInfo[13]
@@ -102,14 +102,14 @@ def judge_read_artifact(readInfo,panelname):
     readend=int(readInfo[16])
     read_seq=readInfo[-1]
     similar=float(readInfo[10])
-    #根据比对位置过滤,鱼钩结构时，snv应该集中在read的一端，并且有softclip    
+    #Filter based on alignment position, for hook structure, SNV should be concentrated at one end of the read and have softclip    
     snv_pos=int(readInfo[1])
     ref_base=readInfo[2]
     alt_base=readInfo[3]
     ref_start=int(readInfo[11])
     ref_end=int(readInfo[12])
 
-    #互补配对区域
+    #Complementary pairing region
     ref_complement_region_start=int(readInfo[19])
     ref_complement_region_end=int(readInfo[20])
     passengers_field=readInfo[-2].split(',')
@@ -118,7 +118,7 @@ def judge_read_artifact(readInfo,panelname):
     
 
     #indel longer than 3bp will bot be considered
-    if len(ref_base)==1 and len(alt_base)>6 and ref_base[0]==alt_base[0]:#inset >5bp
+    if len(ref_base)==1 and len(alt_base)>6 and ref_base[0]==alt_base[0]:#insertion >5bp
         return False,False,False,fragmentid,"Non-AR1"
     if len(ref_base)>6 and len(alt_base)==1 and ref_base[0]==alt_base[0]:#deletion >5bp
         return False,False,False,fragmentid,"Non-AR1"
@@ -132,20 +132,20 @@ def judge_read_artifact(readInfo,panelname):
         else:
             if eachpassengers:
                 passengers.append(eachpassengers)
-    #根据比对分过滤
-    if matchscore<=10:#比对分太低，这个read不该被认为是互补结合产生的
+    #Filter based on alignment score
+    if matchscore<=10:#Alignment score too low, this read should not be considered as produced by complementary binding
         return False,False,False,fragmentid,"Non-AR1"
 
     if snv_pos>ref_complement_region_end or snv_pos<ref_complement_region_start:
         return False,False,False,fragmentid,"Non-AR1"
     
-    #根据比对长度过滤,应大于5
+    #Filter based on alignment length, should be greater than 5
     if len(ref_seq) <=5 or len(query_seq)<=5:
         return False,False,False,fragmentid,"Non-AR1"
 
 #    if len(ref_seq) <=9 or len(query_seq)<=9:
 #        return False,False,False,fragmentid,"Non-AR2"
-    #根据similar过滤，大于0.8
+    #Filter based on similarity, greater than 0.8
     if similar < 0.9:
         return False,False,False,fragmentid,"Non-AR1"
     (judge_f,pos_f,readtype_f)=artifact_pos(cigar,readstart,readend,read_seq,panelname)
@@ -172,7 +172,7 @@ def judge_read_artifact(readInfo,panelname):
 def snv_init_judge_dict(matchfile,snvfile):
     init_judge_dict={}#[total,true,false,type1,type2,5prime,3prime]
     match_dict={}
-    with open(matchfile) as r:#没有header
+    with open(matchfile) as r:#No header
          while True:
             line=r.readline().strip("\n")
             if not line:break
@@ -183,7 +183,7 @@ def snv_init_judge_dict(matchfile,snvfile):
             except KeyError:
                 match_dict[key]=[lineInfo]
     with open(snvfile) as r:
-        header=r.readline().strip("\n")#有header
+        header=r.readline().strip("\n")#Has header
         header_info=header.split('\t')
         while True:
             line=r.readline().strip("\n")
@@ -197,8 +197,8 @@ def snv_judge_dict(init_judge_dict_f,match_dict_f,match_reads_judge_file_f,panel
     level=['Non-AR1','unknown','confused','Non-AR2','Ambiguous-AR1','Ambiguous-AR2','AR1','AR2']
     w_matchfile=open(match_reads_judge_file_f,'w')
     for eachsnv in list(match_dict_f.keys()):
-        tmp_fragment_id_dict={}#{fragmentid:""}用于存储已被计数的fragment
-        for eachread in match_dict_f[eachsnv]:#这是matchresult的整行信息
+        tmp_fragment_id_dict={}#{fragmentid:""} Used to store counted fragments
+        for eachread in match_dict_f[eachsnv]:#This is the entire line information of match result
             (judge,pos,readtype,fragmentid,readlevel)=judge_read_artifact(eachread,panelname)
             if fragmentid in tmp_fragment_id_dict:
                 if level.index(readlevel)<level.index(tmp_fragment_id_dict[fragmentid][3]):
@@ -206,7 +206,7 @@ def snv_judge_dict(init_judge_dict_f,match_dict_f,match_reads_judge_file_f,panel
             tmp_fragment_id_dict[fragmentid]=[judge,pos,readtype,readlevel,eachread[5]]
         used_fragment_id={}
         for eachread in match_dict_f[eachsnv]:#one more time
-            fragmentid='_'.join(eachread[5].split('_')[:-1])#E100047969L1C012R00300322929_163, 这样处理应该没问题
+            fragmentid='_'.join(eachread[5].split('_')[:-1])#E100047969L1C012R00300322929_163, this processing should be fine
             (judge,pos,readtype,readlevel,used_readid)=tmp_fragment_id_dict[fragmentid]
             if eachread[5] != used_readid:continue 
             if fragmentid in used_fragment_id:continue
@@ -222,7 +222,7 @@ def snv_judge_dict(init_judge_dict_f,match_dict_f,match_reads_judge_file_f,panel
                     init_judge_dict_f[eachsnv][5]+=1
                 if pos=='3prime':
                     init_judge_dict_f[eachsnv][6]+=1
-    #read分级统计
+    #Read level statistics
                 if readlevel=="Non-AR1":
                     init_judge_dict_f[eachsnv][8]+=1
                 elif readlevel=="Non-AR2":
@@ -247,7 +247,7 @@ def snv_judge_dict(init_judge_dict_f,match_dict_f,match_reads_judge_file_f,panel
                     init_judge_dict_f[eachsnv][9]+=1
         try:
             positive_reads_ratio=float(init_judge_dict_f[eachsnv][1])/init_judge_dict_f[eachsnv][0]
-        except:#没有找support reads
+        except:#No support reads found
             positive_reads_ratio=float(0)
             
         init_judge_dict_f[eachsnv].append(positive_reads_ratio)
@@ -285,7 +285,7 @@ def snv_judge_dict(init_judge_dict_f,match_dict_f,match_reads_judge_file_f,panel
 
     w_matchfile.close()
     for eachsnv in list(init_judge_dict_f.keys()):
-        if eachsnv not in match_dict_f:#没有reads有match
+        if eachsnv not in match_dict_f:#No reads have match
             init_judge_dict_f[eachsnv].extend(['0','Negative','0','Negative'])
         for i in range(len(init_judge_dict_f[eachsnv])):#all transfer to string format
             init_judge_dict_f[eachsnv][i]=str(init_judge_dict_f[eachsnv][i])
@@ -336,9 +336,9 @@ def write_final_output(output,judge_dict_f,snvfile_f):
             else:
                 pn_tag="U"
 
-            #---------下面的部分用于判断此snv是否应该被过滤------------------------
+            #---------The following part is used to determine whether this SNV should be filtered------------------------
 
-            #白名单header, 以防万一，还是将一二级位点和三级分开处理，设置不同的阈值
+            #Whitelist header, just in case, still separate level 1/2 sites from level 3, set different thresholds
             try:
                 exact_match=lineInfo[tmp_header.index('exact_match')]
             except:
@@ -353,12 +353,12 @@ def write_final_output(output,judge_dict_f,snvfile_f):
             else:
                 freq_cutoff=2
 
-            #过滤规则，fliter_tag为True则过滤，False则不过滤
+            #Filtering rules, filter_tag True means filter, False means not filter
             if pn_tag=="N":
                 fliter_tag=False
             elif pn_tag=="Y":
                 fliter_tag=True
-            elif pn_tag=="A":#这里目前还是先用矫正频率判断，不直接过滤掉
+            elif pn_tag=="A":#Currently still use corrected frequency for judgment here, not directly filtered out
                 if fix_snv_freq>=freq_cutoff:
                     fliter_tag=False
                 else:
@@ -367,7 +367,7 @@ def write_final_output(output,judge_dict_f,snvfile_f):
                 pass
             #-------------------------------------------------------------------
 
-            #最终输出
+            #Final output
             if not fliter_tag:
                 w.write('\t'.join(lineInfo[:-3])+'\n')
     w.close()
@@ -380,6 +380,3 @@ if __name__=='__main__':
     judge_dict=snv_judge_dict(init_judge_dict,match_dict,match_reads_judge_file)
     write_output(my_argv['outdir']+'/'+my_argv['outfile']+'.snv_artifact_judge.txt',judge_dict,my_argv['snv'])
     write_final_output(my_argv['outdir']+'/'+my_argv['outfile']+'.final.txt',judge_dict,my_argv['snv'])
-
-
-

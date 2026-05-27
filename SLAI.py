@@ -1,21 +1,21 @@
 #!coding:utf-8
 
 #----------------------------------------------
-#Project: 商检-基础流程-基础分析
-#Description: 酶切过滤主程序，过滤酶切引起的假阳性位点，主程序主要负责启动多进程
-#Usage: ./counterattack.py -h
-#Author: 骆磊
+#Project: Commercial Inspection - Basic Process - Basic Analysis
+#Description: Main program for enzyme digestion filtering, filters false positive sites caused by enzyme digestion, main program is responsible for launching multi-processes
+#Usage: python3 SLAI.py -h
+#Author: Luo Lei
 #------------------------------------------------
 
 #----------------
 #v0.3
-#read计数改为fragment计数
+#Changed read counting to fragment counting
 #v0.4
-#hook结构的reads要求snv位置和softcilp
+#Hook structure reads require snv position and softclip
 #v0.6
-#对softclip和hardclip有更高的容忍度,稳定版
+#Higher tolerance for softclip and hardclip, stable version
 #v0.7
-#freq 限制为40, 去除hardclip，大规模测试用的版本
+#freq limit set to 40, removed hardclip, version for large-scale testing
 #v0.8
 #add cpu=1
 #os.system changed to subprocess.Popen. subprocess.run only work in python3
@@ -42,19 +42,18 @@ def argument_parser():
     parser.add_argument('--flank',help='flank of snv to match',type=int,default=300)
     parser.add_argument('--cpu',help='cpu core number',type=int,default=8)
     parser.add_argument('--final',help='final output',default=False)
-    parser.add_argument('--panel',help='panel name',default="Normal")
-    parser.add_argument('--do_clean',dest="do_clean",help='If given, clean tem folder',default=False,action="store_true")
+#    parser.add_argument('--do_clean',dest="do_clean",help='If given, clean tem folder',default=False,action="store_true")
     argv=vars(parser.parse_args())
     return argv
 
 def run_filter_artifact(fix_conf_dict,snvfile_f,outfile_f):
     '''
-    多线程调用的函数，实际是启动多个python，为了多进程，要修改一下conf的输出和输入
+    Function called by multi-threading, actually starts multiple python processes, need to modify conf output and input for multi-processing
     '''
     filter_artifact_snv.main(bam=fix_conf_dict['bamfile'],fasta=fix_conf_dict['fasta'],outdir=fix_conf_dict['outdir'],outfile=outfile_f,snvfile=snvfile_f,flank=fix_conf_dict['flank'])
 def split_task(my_conf_dict):
     '''
-    将输入的snv位点拆分为多个，数量用--cpu指定
+    Split input snv sites into multiple parts, number specified by --cpu
     '''
     cpu=int(my_conf_dict['cpu'])
     snv=my_conf_dict['snv']
@@ -63,7 +62,7 @@ def split_task(my_conf_dict):
         split_snv_list.append([])
     with open(snv) as r:
         header=r.readline().strip("\n")
-        k=0#控制加入到哪个分割单位
+        k=0#Control which split unit to add to
         while True:
             line=r.readline()
             if not line:break
@@ -75,7 +74,7 @@ def split_task(my_conf_dict):
 
 def write_split_input(my_conf_dict,split_snv_list,header):
     '''
-    写拆分的输入文件
+    Write split input files
     '''
     outdir=my_conf_dict['outdir']
     outfile=my_conf_dict['outfile']
@@ -101,7 +100,7 @@ if __name__=='__main__':
     argv=argument_parser()
     conf_dict=argv.copy()
 
-    #修改参数和指定输入输出文件
+    #Modify parameters and specify input/output files
     ini_outdir=conf_dict['outdir']
     ini_outfile=conf_dict['outfile']
     finaloutput=conf_dict['final']
@@ -116,7 +115,7 @@ if __name__=='__main__':
 #   if not os.path.exists(support_out) or not os.path.exists(match_out):
     threads=argv['cpu']
     if True:
-        if threads>1:#cpu不是1时用mutiprocess进行多线程
+        if threads>1:#Use multiprocess for multi-threading when cpu is not 1
             conf_dict['outdir']=argv['outdir']+'/tem'
             (split_snv_list,header)=split_task(conf_dict)
             inputlist=write_split_input(conf_dict,split_snv_list,header)
@@ -144,7 +143,7 @@ if __name__=='__main__':
             merge_match_results_cmd='cat %s/tem/%s.snv.part*_artifact_match.txt >%s' %(ini_outdir,ini_outfile,match_out)
             sub.Popen(merge_support_reads_cmd,shell=True).wait()
             sub.Popen(merge_match_results_cmd,shell=True).wait()
-        else:#cpu是1时不进行多线程，直接运行
+        else:#When cpu is 1, run directly without multi-threading
             conf_dict['outdir']=argv['outdir']
             conf_dict['outfile']=argv['outdir']+'/'+argv['outfile']
             conf_dict['snv']=argv['snv']
@@ -157,11 +156,9 @@ if __name__=='__main__':
     inputfile_for_judge=match_out
     snvfile_for_judge=support_out
     (init_judge_dict,match_dict)=judge_artifact.snv_init_judge_dict(inputfile_for_judge,snvfile_for_judge)
-    judge_dict=judge_artifact.snv_judge_dict(init_judge_dict,match_dict,fix_match_out,argv['panel'])#核心工作函数
-    judge_artifact.write_output(outfile_judge,judge_dict,snvfile_for_judge)#输出
-    judge_artifact.write_final_output(out_final_snv_report,judge_dict,snvfile_for_judge)#输出
-    if argv['do_clean'] and os.path.exists(os.path.join(ini_outdir, 'tem')):
-        shutil.rmtree(os.path.join(ini_outdir, 'tem'))
+    judge_dict=judge_artifact.snv_judge_dict(init_judge_dict,match_dict,fix_match_out,"panel15_pro")#Core working function
+    judge_artifact.write_output(outfile_judge,judge_dict,snvfile_for_judge)#Output
+    judge_artifact.write_final_output(out_final_snv_report,judge_dict,snvfile_for_judge)#Output
+#    if argv['do_clean'] and os.path.exists(os.path.join(ini_outdir, 'tem')):
+#        shutil.rmtree(os.path.join(ini_outdir, 'tem'))
     print("Program ends at: "+time.strftime('%Y-%m-%d %H:%M:%S'))
-    
-

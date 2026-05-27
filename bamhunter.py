@@ -3,27 +3,27 @@ import pysam
 import re
 import argparse
 #----------------------------------------------
-#Project: 商检-基础流程-基础分析
-#Description: 酶切过滤程序的核心模块-pysam, 不可单独使用，对pysam进行二次开发，方便主程序使用
-#Usage: 不可单独使用
-#Author: 骆磊
+#Project: Commercial Inspection - Basic Process - Basic Analysis
+#Description: Core module of enzyme digestion filtering program - pysam, cannot be used alone, secondary development of pysam to facilitate use by main program
+#Usage: Cannot be used alone
+#Author: Luo Lei
 #------------------------------------------------
 
 #--------------pysam method
-#alignment_file=pysam.AlignmentFile(bam)#返回迭代器，每一次迭代是一条read
-#allreads=bamfile_handle.fetch('chr1',start=2036839,end=2036840) 以0为坐标起始, 即使是个D，也算mapping上了，这个应该算的是原本能map上的区域
-#sequence=read.query_sequence 返回的是bam文件中的read序列，与ref序列同向，包含softclip但不含hardclip
-#align_pair=read.get_aligned_pairs(with_seq) 不一致的位点是小写，但有少数情况不一致也是大写，莫名其妙
+#alignment_file=pysam.AlignmentFile(bam)#Returns an iterator, each iteration is one read
+#allreads=bamfile_handle.fetch('chr1',start=2036839,end=2036840) 0-based coordinate, even if it's a D, it is considered mapped, this should calculate the originally mappable region
+#sequence=read.query_sequence Returns the read sequence in the bam file, same orientation as reference sequence, includes softclip but not hardclip
+#align_pair=read.get_aligned_pairs(with_seq) Mismatched sites are lowercase, but in rare cases mismatches are also uppercase, inexplicable
 #
 #
 #
 class bamhunter(object):
     '''
     v0: 20220729
-    这个class是为了捕捉错配的reads而写的
-    应该包含的功能有:
-    1. cover到某个/些点的reads列表
-    2. 输入readid和位置就能返回这个位置的比对情况
+    This class is written to capture mismatched reads
+    Functions that should be included:
+    1. List of reads covering certain point(s)
+    2. Input readid and position, return alignment status at that position
     '''
     def __init__(self,bamfile):
         self.bamfile=bamfile
@@ -32,7 +32,7 @@ class bamhunter(object):
 
     def __readbam(self,bam):
         '''
-        pysam的方式读入bam，节省时间和内存
+        Read bam using pysam method, saves time and memory
         '''
         read_info_dict={}
         read_map_dict={}
@@ -40,21 +40,21 @@ class bamhunter(object):
         return bamfile_handle
     def get_pos_reads(self,chrname,start,end):
         '''
-        指定一个位点，获取cover这个位点的所有reads，不管这个碱基有没有比对上
+        Specify a position, get all reads covering this position, regardless of whether the base is aligned
         '''
 #        allreads=bamfile_handle.fetch('chr1',start=2036839,end=2036840)
-#        在外面调用时pos是以1为坐标起始的
+#        When called externally, pos is 1-based coordinate
         start-=1
         end-=1
         allreads=self.pysam_bam.fetch(chrname,start=start,end=end)
-        return allreads#返回覆盖到这个位点的所有reads
+        return allreads#Returns all reads covering this position
                     
     def get_read_pos(self,refpos,read_pysam):
         '''
-        指定一条reads，获取在这个位点，read的第几个碱基，ref的第几个碱基，ref碱基是什么
+        Specify a read, get at this position: which base of the read, which base of the reference, and what the reference base is
         '''
         align_status=read_pysam.get_aligned_pairs(with_seq=True)
-        refpos-=1#外面调用时是1-based
+        refpos-=1#External call is 1-based
         query_seq=read_pysam.query_sequence
         for pileup in align_status:
             if refpos==pileup[1]:
@@ -68,7 +68,7 @@ class bamhunter(object):
         
     def new_get_read_pos(self,refpos,read_pysam,align_status):
         '''
-        指定一条reads，获取在这个位点，read的第几个碱基，ref的第几个碱基，ref碱基是什么
+        Specify a read, get at this position: which base of the read, which base of the reference, and what the reference base is
         '''
         query_seq=read_pysam.query_sequence
         for pileup in align_status:
@@ -81,16 +81,16 @@ class bamhunter(object):
                 return [readpos+1,readbase,refpos+1,pileup[3].upper()]
     def get_read_base(self,readpos,read_pysam):
         '''
-        指定一条read的第几个碱基，输出这个碱基对应的参考基因组的碱基
+        Specify a base position of a read, output the reference genome base corresponding to this base
         '''
         query_seq=read_pysam.query_sequence
         refbase=query_seq[readpos-1]
         return refbase
     def get_read_seq(self,read_pysam,start,end):
         '''
-        取出指定区间的read序列
+        Extract the read sequence within the specified interval
         '''
-        start-=1#换成0-based
+        start-=1#Convert to 0-based
         query_seq=read_pysam.query_sequence
         if start==end:
             return '-'

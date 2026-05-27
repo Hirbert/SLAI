@@ -1,9 +1,9 @@
 #!coding:utf-8
 #----------------------------------------------
-#Project: 商检-基础流程-基础分析
-#Description: 酶切过滤程序的核心模块-比对部分, 也可单独使用，输出snv附近的负链比对结果
-#Usage: ./artifact_identify.py -h
-#Author: 骆磊
+#Project: Commercial Inspection - Basic Process - Basic Analysis
+#Description: Core module of enzyme digestion filtering program - alignment part, can also be used separately to output negative strand alignment results near SNV
+#Usage: python3 artifact_identify.py -h
+#Author: Luo Lei
 #
 #
 #
@@ -20,7 +20,7 @@ import support_reads as SR
 
 def argument_parser():
     '''
-    外部传参
+    Parse external parameters
     '''
     parser = argparse.ArgumentParser(description="check whether snv is potentially from artifact reads")
     parser.add_argument('--snv',help='file or snv(chr1:1000:A:T mean A->T occured at chr1 1000)',required=True)
@@ -36,7 +36,7 @@ def argument_parser():
 
 def complement_reverse(seq):
     '''
-    输入序列，返回对应的反向互补序列
+    Input sequence, return the corresponding reverse complementary sequence
     '''
     tmp=seq.upper()
     tmp=tmp.replace('A', 't')
@@ -48,7 +48,7 @@ def complement_reverse(seq):
 
 def read_fasta(fasta):
     '''
-    返回字典{chr1:'AGCATGCTAGCTACGATC...',....}
+    Return dictionary {chr1:'AGCATGCTAGCTACGATC...',....}
     '''
     ref_dict={}#{chr:sequence,...}
     fasta_handle=pysam.FastxFile(fasta)
@@ -58,93 +58,93 @@ def read_fasta(fasta):
 
 def get_fasta_sequence(ref_dict,chrname,begin,end):
     '''
-    输入基因组上的坐标，根据坐标返回序列
+    Input genomic coordinates, return sequence based on coordinates
     '''
     return ref_dict[chrname][begin-1:end]
 
 def structure_identify(site,ref_dict):
     '''
-    提取snv附近的参考基因组序列，记为A，获取A的反向互补序列，记为B，将A和B用动态规划的方法进行比对
+    Extract the reference genome sequence near the SNV, denote it as A, obtain the reverse complementary sequence of A as B, and align A and B using dynamic programming
     '''
     sites=site.split(':')
     chrname=sites[0]
     pos=int(sites[1])
     ref_base=sites[2]
     alt_base=sites[3]
-    refseq=get_fasta_sequence(ref_dict,chrname,pos-flank,pos+flank-1+len(ref_base))#变异以及上下游的参考序列
-    query_1=get_fasta_sequence(ref_dict,chrname,pos-flank,pos-1)#变异上游的参考序列
-    query_2=get_fasta_sequence(ref_dict,chrname,pos+len(ref_base),pos+flank-1+len(ref_base))#变异下游的参考序列
-    query=complement_reverse(query_1+alt_base+query_2)#变异序列的反向互补序列，用于和参考序列做局部比对
+    refseq=get_fasta_sequence(ref_dict,chrname,pos-flank,pos+flank-1+len(ref_base))#Reference sequence including the variant and its upstream/downstream
+    query_1=get_fasta_sequence(ref_dict,chrname,pos-flank,pos-1)#Reference sequence upstream of the variant
+    query_2=get_fasta_sequence(ref_dict,chrname,pos+len(ref_base),pos+flank-1+len(ref_base))#Reference sequence downstream of the variant
+    query=complement_reverse(query_1+alt_base+query_2)#Reverse complementary sequence of the variant sequence, used for local alignment with reference sequence
 
 
-    #局部比对
-    (m_score,m_cigar,start1,end1,mseq1,start2,end2,mseq2,x,y,z,similarity)=SmithWaterman.local_alignment(refseq,query,0,flank+1)#cover snv的序列的反向互补比对到参考基因组序列
+    #Local alignment
+    (m_score,m_cigar,start1,end1,mseq1,start2,end2,mseq2,x,y,z,similarity)=SmithWaterman.local_alignment(refseq,query,0,flank+1)#Reverse complement of the sequence covering SNV aligns to reference genome sequence
     #-------------------------------------------------------------------------------------------
     #(m_score,m_cigar,start1,end1,mseq1,start2,end2,mseq2,x,y,z)=SmithWaterman.local_alignment(refseq,query,0,0)
-    #m_score 比对分数
-    #m_cigar 比对详情
-    #start1 取出的参考基因组正向序列比对起始位点
-    #end1 取出的参考基因组正向序列比对终止位点
-    #mseq1 比对到的参考基因组正向序列
-    #start2 变异替换后的序列反向互补序列起始位点(正向的终止位点)
-    #end2 变异替换后的序列反向互补序列终止位点(正向的起始位点)
-    #mseq2 变异替换后的序列反向互补序列
+    #m_score Alignment score
+    #m_cigar Alignment details
+    #start1 Alignment start site of extracted forward reference genome sequence
+    #end1 Alignment end site of extracted forward reference genome sequence
+    #mseq1 Aligned forward reference genome sequence
+    #start2 Start site of the reverse complementary sequence of the variant sequence (forward end site)
+    #end2 End site of the reverse complementary sequence of the variant sequence (forward start site)
+    #mseq2 Reverse complementary sequence of the variant sequence
     #-----------------------------------------------------------------------------
 
 
-    #比对后分析
-    if not int(m_score):#无回文假阳基础的位点
+    #Analysis after alignment
+    if not int(m_score):#Site without palindrome false positive basis
         return None
 
-    #将比对的结果坐标映射到参考基因组上
-    new_start1= pos - flank - 1 +int(start1)#参考基因组序列上实际的比对起始位点
-    new_end1=pos - flank - 1 + int(end1)#参考基因组序列上实际的比对终止位点
-    start2_r=2*flank+len(alt_base)-int(end2)+1#变异替换后的序列反向互补序列在正向序列的起始位点
-    end2_r=2*flank+len(ref_base)-int(start2)+1#变异替换后的序列反向互补序列在正向序列的终止位点
-    new_start2=pos-flank-1 +start2_r#变异替换后的序列反向互补序列在基因组上正向序列的起始位点
-    new_end2=pos-flank-1+end2_r#变异替换后的序列反向互补序列在基因组上正向序列的终止位点
-    reverse_query_seq=complement_reverse(mseq2)#变异替换后的序列的反向互补序列比对上的区域的反向互补序列（正向）
+    #Map alignment results to reference genome coordinates
+    new_start1= pos - flank - 1 +int(start1)#Actual alignment start site on reference genome sequence
+    new_end1=pos - flank - 1 + int(end1)#Actual alignment end site on reference genome sequence
+    start2_r=2*flank+len(alt_base)-int(end2)+1#Start site of the reverse complementary sequence of the variant sequence in forward orientation
+    end2_r=2*flank+len(ref_base)-int(start2)+1#End site of the reverse complementary sequence of the variant sequence in forward orientation
+    new_start2=pos-flank-1 +start2_r#Start site of the reverse complementary sequence of the variant sequence on the forward genome strand
+    new_end2=pos-flank-1+end2_r#End site of the reverse complementary sequence of the variant sequence on the forward genome strand
+    reverse_query_seq=complement_reverse(mseq2)#Reverse complement of the aligned region of the variant sequence (forward orientation)
     return [chrname,pos,ref_base,alt_base,m_score,m_cigar,new_start1,new_end1,new_start2,mseq1,new_end2,reverse_query_seq,mseq2,similarity]
 
 def read_ref_alignment(read,chrname,pos,ref_base,alt_base,ref_dict,flank,keysite):
-    refseq=get_fasta_sequence(ref_dict,chrname,pos-flank,pos+flank-1+len(ref_base))#变异以及上下游的参考序列
-    query=complement_reverse(read)#变异序列的反向互补序列，用于和参考序列做局部比对
+    refseq=get_fasta_sequence(ref_dict,chrname,pos-flank,pos+flank-1+len(ref_base))#Reference sequence including the variant and its upstream/downstream
+    query=complement_reverse(read)#Reverse complementary sequence of the variant sequence, used for local alignment with reference sequence
     keysite=len(read)-keysite+1
 
 
-    #局部比对
-    (m_score,m_cigar,start1,end1,mseq1,start2,end2,mseq2,x,y,z,similarity)=SmithWaterman.local_alignment(refseq,query,0,keysite)#cover snv的序列的反向互补比对到参考基因组序列
+    #Local alignment
+    (m_score,m_cigar,start1,end1,mseq1,start2,end2,mseq2,x,y,z,similarity)=SmithWaterman.local_alignment(refseq,query,0,keysite)#Reverse complement of the sequence covering SNV aligns to reference genome sequence
     #-------------------------------------------------------------------------------------------
     #(m_score,m_cigar,start1,end1,mseq1,start2,end2,mseq2,x,y,z)=SmithWaterman.local_alignment(refseq,query,0,0)
-    #m_score 比对分数
-    #m_cigar 比对详情
-    #start1 取出的参考基因组正向序列比对起始位点
-    #end1 取出的参考基因组正向序列比对终止位点
-    #mseq1 比对到的参考基因组正向序列
-    #start2 变异替换后的序列反向互补序列起始位点(正向的终止位点)
-    #end2 变异替换后的序列反向互补序列终止位点(正向的起始位点)
-    #mseq2 变异替换后的序列反向互补序列
+    #m_score Alignment score
+    #m_cigar Alignment details
+    #start1 Alignment start site of extracted forward reference genome sequence
+    #end1 Alignment end site of extracted forward reference genome sequence
+    #mseq1 Aligned forward reference genome sequence
+    #start2 Start site of the reverse complementary sequence of the variant sequence (forward end site)
+    #end2 End site of the reverse complementary sequence of the variant sequence (forward start site)
+    #mseq2 Reverse complementary sequence of the variant sequence
     #-----------------------------------------------------------------------------
 
 
-    #比对后分析
-    if not int(m_score):#无回文假阳基础的位点
+    #Analysis after alignment
+    if not int(m_score):#Site without palindrome false positive basis
         return None
 
-    #将比对的结果坐标映射到参考基因组上
-    new_start1= pos - flank - 1 +int(start1)#参考基因组序列上实际的比对起始位点
-    new_end1=pos - flank - 1 + int(end1)#参考基因组序列上实际的比对终止位点
-    new_start2=len(read)-int(end2)+1 # read反向互补之前的起始位点
-    new_end2=len(read)-int(start2)+1 # read反向互补之前的终止位点
+    #Map alignment results to reference genome coordinates
+    new_start1= pos - flank - 1 +int(start1)#Actual alignment start site on reference genome sequence
+    new_end1=pos - flank - 1 + int(end1)#Actual alignment end site on reference genome sequence
+    new_start2=len(read)-int(end2)+1 #Start site before reverse complement of read
+    new_end2=len(read)-int(start2)+1 #End site before reverse complement of read
     reverse_mseq1=complement_reverse(mseq1)
     reverse_mseq2=complement_reverse(mseq2)
     return [chrname,pos,ref_base,alt_base,m_score,m_cigar,new_start1,new_end1,mseq1,reverse_mseq1,new_start2,new_end2,reverse_mseq2,mseq2,similarity]
 def reverse_cigar(cigar):
     '''
-    输出反向的cigar
+    Output reversed cigar
     '''
     new_cigar=''
-    pattern=re.compile('((\d+)([SDIM]))')#这里的S指的是subsititution，bam中的cigar没有碱基的替换
+    pattern=re.compile('((\d+)([SDIM]))')#S here means substitution, CIGAR in BAM has no base substitution
     cigar_parse=re.findall(pattern,cigar)
     cigar_parse.reverse()
     for each_cigar in cigar_parse:
@@ -153,10 +153,10 @@ def reverse_cigar(cigar):
 
 def present_artifact(match_list):
     '''
-    输出比对结果，作为模块时不执行此函数，单独使用此脚本时使用，将比对结果输出到标准输出，并用下划线标记snv
+    Output alignment results. When used as a module, this function is not executed. When the script is used alone, output alignment results to stdout and mark SNV with underscores
     '''
     (chrname,pos,ref_base,alt_base,m_score,m_cigar,new_start1,new_end1,new_start2,mseq1,new_end2,reverse_query_seq,mseq2,similarity)=match_list
-    #ref高亮
+    #ref highlight
     part1=mseq1[0:pos-new_start1]
     part2=mseq1[pos-new_start1:pos-new_start1+len(ref_base)]
     part3=mseq1[pos-new_start1+len(ref_base):]
@@ -167,7 +167,7 @@ def present_artifact(match_list):
     part2=mseq1_reverse[pos-new_start1:pos-new_start1+len(alt_base)]
     part3=mseq1_reverse[pos-new_start1+len(alt_base):]
     new_mseq1_reverse=part1+'\033[4m'+part2+'\033[0m'+part3
-    #query高亮
+    #query highlight
     part1=mseq2[0:pos-new_start2]
     part2=mseq2[pos-new_start2:pos-new_start2+len(alt_base)]
     part3=mseq2[pos-new_start2+len(alt_base):]
@@ -180,7 +180,7 @@ def present_artifact(match_list):
     part3=ref_cover_snv_tmp2[pos-new_start2+len(ref_base):]
     ref_cover_snv=part1+'\033[4m'+part2+'\033[0m'+part3
 
-    #用alt替代ref型，alt cover snv
+    #Replace ref type with alt type, alt cover snv
     part2=alt_base
     alt_cover_snv=part1+'\033[4m'+part2+'\033[0m'+part3
     true_seq=part1+part2+part3
@@ -197,10 +197,10 @@ if __name__=='__main__':
     outflie=argv['outfile']
     flank=argv['flank']
     present=argv['present']
-#   读fasta
+#   Read fasta
     ref_dict=read_fasta(fasta)
 
-#   处理snv，是一个位点还是一个文件
+#   Process snv, whether it is a single site or a file
     match_list=[]
     if ':' in snv:
         match_result=structure_identify(snv,ref_dict)
@@ -224,4 +224,3 @@ if __name__=='__main__':
     if present:
         for eachsnv in match_list:
             present_artifact(eachsnv)
-
